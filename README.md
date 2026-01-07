@@ -1,2 +1,2 @@
-# Cortex API
-This is a placeholder README for the repository of Cortex API.
+# Everiety API
+This is a placeholder README for the repository of Everiety API.

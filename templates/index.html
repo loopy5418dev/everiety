@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Everiety</title>
+<link href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism-tomorrow.min.css" rel="stylesheet"/>
+
+<style>
+:root {
+  --bg: #000;
+  --fg: #fff;
+  --muted: #888;
+  --card: #111;
+  --border: #222;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.container {
+  max-width: 900px;
+  padding: 16px;
+  margin: auto;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.filters button {
+  background: #111;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.filters button.active {
+  background: #222;
+}
+
+.search {
+  width: 100%;
+  padding: 10px;
+  background: #111;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.endpoint {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.endpoint-header {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  align-items: center;
+  background: var(--card);
+}
+
+.method {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.GET { background: #1e90ff; }
+.POST { background: #2ecc71; }
+.PUT { background: #f1c40f; color: #000; }
+.DELETE { background: #e74c3c; }
+
+.path {
+  font-weight: 500;
+}
+
+.category {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.endpoint-body {
+  display: none;
+  padding: 12px;
+  background: #0c0c0c;
+  border-top: 1px solid var(--border);
+}
+
+pre {
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.toggle-error {
+  margin-top: 8px;
+  color: #1e90ff;
+  cursor: pointer;
+  font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>Everiety Documentation</h1>
+  <div class="filters" id="filters"></div>
+  <input class="search" id="search" placeholder="Search endpoints..." />
+  <div id="endpoints"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/prismjs/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-http.min.js"></script>
+
+<script>
+const API_DATA_URL = "https://gist.githubusercontent.com/loopy5418/479de0364e71e1809fc31cebbec88991/raw/everietyEndpointData.json";
+let apiData = null;
+
+let activeCategory = "All";
+
+const filtersEl = document.getElementById("filters");
+const endpointsEl = document.getElementById("endpoints");
+const searchEl = document.getElementById("search");
+
+function renderFilters() {
+  filtersEl.innerHTML = "";
+  ["All", ...apiData.categories].forEach(cat => {
+    const btn = document.createElement("button");
+    btn.textContent = cat;
+    if (cat === activeCategory) btn.classList.add("active");
+    btn.onclick = () => {
+      activeCategory = cat;
+      renderFilters();
+      renderEndpoints();
+    };
+    filtersEl.appendChild(btn);
+  });
+}
+
+function codeBlock(lang, content) {
+  return `<pre><code class="language-${lang}">${Prism.util.encode(content)}</code></pre>`;
+}
+
+function renderEndpoints() {
+  const q = searchEl.value.toLowerCase();
+  endpointsEl.innerHTML = "";
+
+  apiData.endpoints
+    .filter(e =>
+      (activeCategory === "All" || e.category === activeCategory) &&
+      (e.name.toLowerCase().includes(q) ||
+       e.description.toLowerCase().includes(q))
+    )
+    .forEach(e => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "endpoint";
+
+      const header = document.createElement("div");
+      header.className = "endpoint-header";
+      header.innerHTML = `
+        <span class="method ${e.method}">${e.method}</span>
+        <div>
+          <div class="path">${e.path}</div>
+          <div class="category">${e.category}</div>
+        </div>
+      `;
+
+      const body = document.createElement("div");
+      body.className = "endpoint-body";
+      body.innerHTML = `
+        <p>${e.description}</p>
+
+        ${e.params ? `<h4>URL Params</h4>${codeBlock("json", JSON.stringify(e.params, null, 2))}` : ""}
+        ${e.body ? `<h4>Request Body</h4>${codeBlock("json", JSON.stringify(e.body, null, 2))}` : ""}
+
+        ${e.exampleUrl ? `<h4>Example URL</h4>${codeBlock("http", e.exampleUrl)}` : ""}
+        ${e.exampleRequest ? `<h4>Example Request</h4>${codeBlock("json", JSON.stringify(e.exampleRequest, null, 2))}` : ""}
+
+        <h4>Example Response</h4>
+        ${codeBlock("json", JSON.stringify(e.exampleResponse, null, 2))}
+
+        <div class="toggle-error">View error response</div>
+        <div style="display:none;">
+          ${codeBlock("json", JSON.stringify(e.errorResponse, null, 2))}
+        </div>
+      `;
+
+      header.onclick = () => {
+        body.style.display = body.style.display === "block" ? "none" : "block";
+        Prism.highlightAllUnder(body);
+      };
+
+      body.querySelector(".toggle-error").onclick = ev => {
+        ev.stopPropagation();
+        const err = ev.target.nextElementSibling;
+        err.style.display = err.style.display === "block" ? "none" : "block";
+        Prism.highlightAllUnder(err);
+      };
+
+      wrapper.appendChild(header);
+      wrapper.appendChild(body);
+      endpointsEl.appendChild(wrapper);
+    });
+}
+
+async function loadApiData() {
+  try {
+    const res = await fetch(API_DATA_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch API data");
+    apiData = await res.json();
+
+    renderFilters();
+    renderEndpoints();
+  } catch (err) {
+    endpointsEl.innerHTML = `
+      <div style="color:#e74c3c;">
+        Failed to load API documentation: ${err.message}
+      </div>
+    `;
+    console.error(err);
+  }
+}
+
+searchEl.oninput = renderEndpoints;
+
+loadApiData();
+</script>
+</body>
+</html> 
